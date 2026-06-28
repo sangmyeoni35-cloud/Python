@@ -1,0 +1,132 @@
+class MemberService:
+    def __init__(self, member_dao):
+        self.member_dao = member_dao
+
+    def join(self, login_id, password, name, phone, address):
+        return self.member_dao.insert(login_id, password, name, phone, address)
+
+    def login(self, login_id, password):
+        return self.member_dao.login(login_id, password)
+
+    def list_members(self):
+        return self.member_dao.find_all()
+
+
+class CompanyService:
+    def __init__(self, company_dao):
+        self.company_dao = company_dao
+
+    def join(self, login_id, password, company_name, ceo_name, business_no, category, phone, address):
+        return self.company_dao.insert(login_id, password, company_name, ceo_name, business_no, category, phone, address)
+
+    def login(self, login_id, password):
+        return self.company_dao.login(login_id, password)
+
+    def approve_company(self, company_id):
+        return self.company_dao.approve(company_id)
+
+    def search_by_category(self, category):
+        return self.company_dao.find_by_category(category)
+
+    def list_companies(self):
+        return self.company_dao.find_all()
+
+
+class RepairService:
+    def __init__(self, request_dao, company_dao, contract_dao):
+        self.request_dao = request_dao
+        self.company_dao = company_dao
+        self.contract_dao = contract_dao
+
+    def create_request(self, member_id, category, title, content, address):
+        return self.request_dao.insert(member_id, category, title, content, address)
+
+    def list_requests(self):
+        return self.request_dao.find_all()
+
+    def select_company(self, request_id, member_id, company_id, amount):
+        request = self.request_dao.find_by_id(request_id)
+        company = self.company_dao.find_by_id(company_id)
+
+        if not request:
+            raise ValueError("수리요청이 존재하지 않습니다.")
+        if not company:
+            raise ValueError("업체가 존재하지 않습니다.")
+        if company.approval_status != "승인":
+            raise ValueError("승인되지 않은 업체입니다.")
+
+        request.status = "업체선택"
+        return self.contract_dao.insert(request_id, member_id, company_id, amount)
+
+    def complete_work(self, contract_id):
+        return self.contract_dao.update_status(contract_id, "작업완료")
+
+
+class PaymentService:
+    def __init__(self, payment_dao, settlement_dao, contract_dao):
+        self.payment_dao = payment_dao
+        self.settlement_dao = settlement_dao
+        self.contract_dao = contract_dao
+
+    def pay(self, contract_id, member_id, admin_id, amount):
+        payment = self.payment_dao.insert(contract_id, member_id, admin_id, amount)
+        return payment
+
+    def confirm_payment(self, payment_id):
+        return self.payment_dao.confirm(payment_id)
+
+    def approve_complete_and_settle(self, payment_id, company_id):
+        payment = self.payment_dao.find_by_id(payment_id)
+        if not payment:
+            raise ValueError("결제 정보가 없습니다.")
+        if payment.status != "입금확인":
+            raise ValueError("관리자 입금확인이 필요합니다.")
+
+        payment.status = "완료승인"
+        settlement = self.settlement_dao.insert(payment, company_id)
+        return settlement
+
+    def complete_settlement(self, settlement_id):
+        return self.settlement_dao.complete(settlement_id)
+
+    def list_payments(self):
+        return self.payment_dao.find_all()
+
+    def list_settlements(self):
+        return self.settlement_dao.find_all()
+
+
+class ReviewService:
+    def __init__(self, review_dao):
+        self.review_dao = review_dao
+
+    def write_review(self, contract_id, member_id, company_id, rating, content):
+        return self.review_dao.insert(contract_id, member_id, company_id, rating, content)
+
+    def list_reviews(self):
+        return self.review_dao.find_all()
+
+
+class AdminService:
+    def __init__(self, admin_dao, member_service, company_service, payment_service):
+        self.admin_dao = admin_dao
+        self.member_service = member_service
+        self.company_service = company_service
+        self.payment_service = payment_service
+
+    def login(self, login_id, password):
+        return self.admin_dao.login(login_id, password)
+
+    def statistics(self):
+        payments = self.payment_service.list_payments()
+        total_payment = sum(p.payment_amount for p in payments)
+        total_fee = sum(p.fee_amount for p in payments)
+        total_settlement = sum(p.settlement_amount for p in payments)
+
+        return {
+            "회원수": len(self.member_service.list_members()),
+            "업체수": len(self.company_service.list_companies()),
+            "총결제금액": total_payment,
+            "플랫폼수익": total_fee,
+            "업체정산금": total_settlement
+        }

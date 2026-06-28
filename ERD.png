@@ -1,0 +1,211 @@
+from model import Member, Company, Admin, RepairRequest, Contract, Payment, Settlement, Review, Notice
+
+
+class BaseDAO:
+    def __init__(self):
+        self.sequence = 1
+
+    def next_id(self):
+        value = self.sequence
+        self.sequence += 1
+        return value
+
+
+class MemberDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.members = []
+
+    def insert(self, login_id, password, name, phone, address):
+        member = Member(self.next_id(), login_id, password, name, phone, address)
+        self.members.append(member)
+        return member
+
+    def login(self, login_id, password):
+        for member in self.members:
+            if member.login_id == login_id and member.password == password:
+                return member
+        return None
+
+    def find_all(self):
+        return self.members
+
+    def find_by_id(self, member_id):
+        return next((m for m in self.members if m.member_id == member_id), None)
+
+
+class CompanyDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.companies = []
+
+    def insert(self, login_id, password, company_name, ceo_name, business_no, category, phone, address):
+        company = Company(self.next_id(), login_id, password, company_name, ceo_name, business_no, category, phone, address)
+        self.companies.append(company)
+        return company
+
+    def login(self, login_id, password):
+        for company in self.companies:
+            if company.login_id == login_id and company.password == password:
+                return company
+        return None
+
+    def approve(self, company_id):
+        company = self.find_by_id(company_id)
+        if company:
+            company.approval_status = "승인"
+        return company
+
+    def find_by_category(self, category):
+        return [c for c in self.companies if c.category == category and c.approval_status == "승인"]
+
+    def find_all(self):
+        return self.companies
+
+    def find_by_id(self, company_id):
+        return next((c for c in self.companies if c.company_id == company_id), None)
+
+
+class AdminDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.admins = [Admin(1, "admin", "1234", "관리자", "010-0000-0000")]
+        self.sequence = 2
+
+    def login(self, login_id, password):
+        for admin in self.admins:
+            if admin.login_id == login_id and admin.password == password:
+                return admin
+        return None
+
+
+class RepairRequestDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.requests = []
+
+    def insert(self, member_id, category, title, content, address):
+        request = RepairRequest(self.next_id(), member_id, category, title, content, address)
+        self.requests.append(request)
+        return request
+
+    def find_all(self):
+        return self.requests
+
+    def find_by_member(self, member_id):
+        return [r for r in self.requests if r.member_id == member_id]
+
+    def find_by_id(self, request_id):
+        return next((r for r in self.requests if r.request_id == request_id), None)
+
+
+class ContractDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.contracts = []
+
+    def insert(self, request_id, member_id, company_id, agreed_amount):
+        contract = Contract(self.next_id(), request_id, member_id, company_id, agreed_amount)
+        self.contracts.append(contract)
+        return contract
+
+    def find_all(self):
+        return self.contracts
+
+    def find_by_id(self, contract_id):
+        return next((c for c in self.contracts if c.contract_id == contract_id), None)
+
+    def find_by_company(self, company_id):
+        return [c for c in self.contracts if c.company_id == company_id]
+
+    def update_status(self, contract_id, status):
+        contract = self.find_by_id(contract_id)
+        if contract:
+            contract.status = status
+        return contract
+
+
+class PaymentDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.payments = []
+
+    def insert(self, contract_id, member_id, admin_id, payment_amount):
+        fee_amount = int(payment_amount * 0.03)
+        settlement_amount = payment_amount - fee_amount
+        payment = Payment(
+            self.next_id(), contract_id, member_id, admin_id,
+            payment_amount, fee_amount, settlement_amount
+        )
+        self.payments.append(payment)
+        return payment
+
+    def find_all(self):
+        return self.payments
+
+    def find_by_id(self, payment_id):
+        return next((p for p in self.payments if p.payment_id == payment_id), None)
+
+    def confirm(self, payment_id):
+        payment = self.find_by_id(payment_id)
+        if payment:
+            payment.status = "입금확인"
+        return payment
+
+
+class SettlementDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.settlements = []
+
+    def insert(self, payment, company_id):
+        settlement = Settlement(
+            self.next_id(), payment.payment_id, company_id,
+            payment.payment_amount, payment.fee_amount, payment.settlement_amount
+        )
+        self.settlements.append(settlement)
+        return settlement
+
+    def find_all(self):
+        return self.settlements
+
+    def find_by_company(self, company_id):
+        return [s for s in self.settlements if s.company_id == company_id]
+
+    def complete(self, settlement_id):
+        for settlement in self.settlements:
+            if settlement.settlement_id == settlement_id:
+                settlement.status = "정산완료"
+                return settlement
+        return None
+
+
+class ReviewDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.reviews = []
+
+    def insert(self, contract_id, member_id, company_id, rating, content):
+        review = Review(self.next_id(), contract_id, member_id, company_id, rating, content)
+        self.reviews.append(review)
+        return review
+
+    def find_all(self):
+        return self.reviews
+
+    def find_by_company(self, company_id):
+        return [r for r in self.reviews if r.company_id == company_id]
+
+
+class NoticeDAO(BaseDAO):
+    def __init__(self):
+        super().__init__()
+        self.notices = []
+
+    def insert(self, admin_id, title, content):
+        notice = Notice(self.next_id(), admin_id, title, content)
+        self.notices.append(notice)
+        return notice
+
+    def find_all(self):
+        return self.notices

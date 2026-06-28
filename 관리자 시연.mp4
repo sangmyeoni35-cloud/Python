@@ -1,0 +1,43 @@
+from dao import (
+    MemberDAO, CompanyDAO, AdminDAO,
+    RepairRequestDAO, ContractDAO, PaymentDAO,
+    SettlementDAO, ReviewDAO, NoticeDAO
+)
+from service import (
+    MemberService, CompanyService, RepairService,
+    PaymentService, ReviewService, AdminService
+)
+from console import Console
+
+
+def main():
+    member_dao = MemberDAO()
+    company_dao = CompanyDAO()
+    admin_dao = AdminDAO()
+    request_dao = RepairRequestDAO()
+    contract_dao = ContractDAO()
+    payment_dao = PaymentDAO()
+    settlement_dao = SettlementDAO()
+    review_dao = ReviewDAO()
+    notice_dao = NoticeDAO()
+
+    member_service = MemberService(member_dao)
+    company_service = CompanyService(company_dao)
+    repair_service = RepairService(request_dao, company_dao, contract_dao)
+    payment_service = PaymentService(payment_dao, settlement_dao, contract_dao)
+    review_service = ReviewService(review_dao)
+    admin_service = AdminService(admin_dao, member_service, company_service, payment_service)
+
+    app = Console(
+        member_service,
+        company_service,
+        repair_service,
+        payment_service,
+        review_service,
+        admin_service
+    )
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
